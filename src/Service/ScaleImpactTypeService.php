@@ -23,7 +23,6 @@ class ScaleImpactTypeService
         private InstanceTable $instanceTable,
         private InstanceService $instanceService,
         private InstanceConsequenceService $instanceConsequenceService,
-        private ConfigService $configService,
         ConnectedUserService $connectedUserService
     ) {
         $this->connectedUser = $connectedUserService->getConnectedUser();
@@ -118,20 +117,17 @@ class ScaleImpactTypeService
     public function createDefaultScaleImpactTypes(Entity\Scale $scale): void
     {
         $defaultScaleImpactTypes = Entity\ScaleImpactTypeSuperClass::getDefaultScalesImpacts();
-        $languageCodes = $this->configService->getLanguageCodes();
         foreach (Entity\ScaleImpactTypeSuperClass::getScaleImpactTypesShortcuts() as $type => $shortcut) {
-            $labels = [];
-            foreach (range(1, 4) as $index) {
-                $languageCode = $languageCodes[$index] ?? null;
-                if ($languageCode !== null && isset($defaultScaleImpactTypes[$languageCode][$shortcut])) {
-                    $labels['label' . $index] = $defaultScaleImpactTypes[$languageCode][$shortcut];
-                }
-            }
             $this->create($scale->getAnr(), [
                 'scale' => $scale,
                 'type' => $type,
                 'isSys' => true,
-                'labels' => $labels,
+                'labels' => [
+                    'label1' => $defaultScaleImpactTypes['label1'][$shortcut],
+                    'label2' => $defaultScaleImpactTypes['label2'][$shortcut],
+                    'label3' => $defaultScaleImpactTypes['label3'][$shortcut],
+                    'label4' => $defaultScaleImpactTypes['label4'][$shortcut],
+                ],
             ], false);
         }
     }

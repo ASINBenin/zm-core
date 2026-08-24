@@ -65,7 +65,7 @@ class ConfigService
     {
         if (empty($this->languageCodes)) {
             foreach ($this->config['languages'] as $languageCode => $languageData) {
-                $this->languageCodes[$languageData['index']] = $languageCode;
+                $this->languageCodes[$languageData['index']] = strtoupper($languageCode);
             }
         }
 

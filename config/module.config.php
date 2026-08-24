@@ -28,6 +28,11 @@ use Monarc\Core\Service\Model\Entity as ServiceModelEntity;
 use Laminas\ServiceManager\AbstractFactory\ReflectionBasedAbstractFactory;
 use Laminas\ServiceManager\Factory\InvokableFactory;
 use Laminas\ServiceManager\Proxy\LazyServiceFactory;
+use Monarc\Core\Controller\SsoAuthenticationController;
+use Monarc\Core\Provider\IdentityProviderFactory;
+use Monarc\Core\Provider\IdentityProviderInterface;
+use Monarc\Core\Service\IdentityManagementService;
+use Monarc\Core\Service\IdentityManagementServiceFactory;
 
 $env = getenv('APPLICATION_ENV') ?: 'production';
 $dataPath = './data';
@@ -96,12 +101,32 @@ return [
                 ],
             ],
 
+            'sso-redirect' => [
+                'type' => 'literal',
+                'options' => [
+                    'route' => '/auth/sso/redirect',
+                    'defaults' => [
+                        'controller' => Controller\SsoAuthenticationController::class,
+                        'action' => 'redirect',
+                    ],
+                ],
+            ],
+            'sso-callback' => [
+                'type' => 'literal',
+                'options' => [
+                    'route' => '/auth/sso/callback',
+                    'defaults' => [
+                        'controller' => Controller\SsoAuthenticationController::class,
+                        'action' => 'callback',
+                    ],
+                ],
+            ],
             'auth' => [
                 'type' => 'segment',
                 'options' => [
                     'route' => '/auth[/:id]',
                     'constraints' => [
-                        'id' => '.+',
+                        'id' => '[a-zA-Z0-9_-]+',
                     ],
                     'defaults' => [
                         'controller' => Controller\AuthenticationController::class,
@@ -120,6 +145,7 @@ return [
         'factories' => [
             Controller\IndexController::class => InvokableFactory::class,
             Controller\AuthenticationController::class => AutowireFactory::class,
+            SsoAuthenticationController::class => ReflectionBasedAbstractFactory::class
         ],
     ],
     'service_manager' => [
@@ -139,6 +165,9 @@ return [
             Service\HistoricalService::class => Service\HistoricalServiceFactory::class,
             Service\DeliveriesModelsService::class => Service\DeliveriesModelsServiceFactory::class,
             /* Services. */
+            IdentityProviderInterface::class => IdentityProviderFactory::class,
+            IdentityManagementService::class => IdentityManagementServiceFactory::class,
+        
             Service\AmvService::class => AutowireFactory::class,
             Service\AnrService::class => AutowireFactory::class,
             Service\UserRoleService::class => AutowireFactory::class,
@@ -376,4 +405,22 @@ return [
     ],
 
     'defaultLanguageIndex' => 1,
+    'languages' => [
+        'fr' => [
+            'index' => 1,
+            'label' => 'Français',
+        ],
+        'en' => [
+            'index' => 2,
+            'label' => 'English',
+        ],
+        'de' => [
+            'index' => 3,
+            'label' => 'Deutsch',
+        ],
+        'nl' => [
+            'index' => 4,
+            'label' => 'Nederlands',
+        ],
+    ],
 ];

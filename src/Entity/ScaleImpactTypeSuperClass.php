@@ -236,7 +236,7 @@ class ScaleImpactTypeSuperClass
     public static function getDefaultScalesImpacts(): array
     {
         return [
-            'fr' => [
+            'label1' => [
                 'C' => 'Confidentialité',
                 'I' => 'Intégrité',
                 'D' => 'Disponibilité',
@@ -244,9 +244,9 @@ class ScaleImpactTypeSuperClass
                 'O' => 'Opérationnel',
                 'L' => 'Légal',
                 'F' => 'Financier',
-                'P' => 'Personne',
+                'P' => 'Personne'
             ],
-            'en' => [
+            'label2' => [
                 'C' => 'Confidentiality',
                 'I' => 'Integrity',
                 'D' => 'Availability',
@@ -254,9 +254,9 @@ class ScaleImpactTypeSuperClass
                 'O' => 'Operational',
                 'L' => 'Legal',
                 'F' => 'Financial',
-                'P' => 'Personal',
+                'P' => 'Personal'
             ],
-            'de' => [
+            'label3' => [
                 'C' => 'Vertraulichkeit',
                 'I' => 'Integrität',
                 'D' => 'Verfügbarkeit',
@@ -264,9 +264,9 @@ class ScaleImpactTypeSuperClass
                 'O' => 'Einsatzbereit',
                 'L' => 'Legal',
                 'F' => 'Finanziellen',
-                'P' => 'Person',
+                'P' => 'Person'
             ],
-            'nl' => [
+            'label4' => [
                 'C' => 'Vertrouwelijkheid',
                 'I' => 'Integriteit',
                 'D' => 'Beschikbaarheid',
@@ -274,17 +274,7 @@ class ScaleImpactTypeSuperClass
                 'O' => 'Operationeel',
                 'L' => 'Legaal',
                 'F' => 'Financieel',
-                'P' => 'Persoon',
-            ],
-            'pt' => [
-                'C' => 'Confidencialidade',
-                'I' => 'Integridade',
-                'D' => 'Disponibilidade',
-                'R' => 'Reputação',
-                'O' => 'Operacional',
-                'L' => 'Legal',
-                'F' => 'Financeiro',
-                'P' => 'Pessoal',
+                'P' => 'Persoon'
             ],
         ];
     }

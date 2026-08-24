@@ -214,12 +214,12 @@ class DeliveriesModels extends AbstractEntity
     {
         parent::exchangeArray($options);
 
-        $languages = [
+        $languages = array(
             1 => 'FR',
             2 => 'EN',
             3 => 'DE',
             4 => 'NE',
-        ];
+        );
 
         $dirFile = './data';
         $appconfdir = getenv('APP_CONF_DIR') ? getenv('APP_CONF_DIR') : '';

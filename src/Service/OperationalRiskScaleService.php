@@ -429,7 +429,7 @@ class OperationalRiskScaleService
 
     protected function getLanguageCodesForTranslations(): array
     {
-        return $this->configService->getLanguageCodes();
+        return $this->configService->getActiveLanguageCodes();
     }
 
     /**

@@ -279,6 +279,6 @@ class InstanceRiskOpService
 
     private function getUiSelectedLanguageCode(): string
     {
-        return $this->configService->getLanguageCodes()[$this->connectedUser->getLanguage()];
+        return strtolower($this->configService->getLanguageCodes()[$this->connectedUser->getLanguage()]);
     }
 }

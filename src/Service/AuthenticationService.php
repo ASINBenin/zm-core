@@ -14,6 +14,7 @@ use Monarc\Core\Adapter\Authentication as AuthenticationAdapter;
 use Monarc\Core\Storage\Authentication as AuthenticationStorage;
 use RobThree\Auth\Providers\Qr\EndroidQrCodeProvider;
 use RobThree\Auth\TwoFactorAuth;
+use Monarc\Core\Entity\UserSuperClass;
 
 class AuthenticationService
 {
@@ -149,5 +150,19 @@ class AuthenticationService
         }
 
         return false;
+    }
+
+    /**
+     * Crée une session et génère un jeton d'authentification pour un utilisateur connecté via SSO
+     */
+    public function createSessionForUser(UserSuperClass $user): array
+    {
+        $token = uniqid(bin2hex(random_bytes(random_int(20, 40))), true);
+        $this->authenticationStorage->addUserToken($token, $user);
+
+        return [
+            'token' => $token,
+            'user' => $user,
+        ];
     }
 }

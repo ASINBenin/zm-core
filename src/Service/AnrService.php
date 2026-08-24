@@ -46,8 +46,6 @@ class AnrService
 
     private OperationalRiskScaleService $operationalRiskScaleService;
 
-    private SoaScaleCommentService $soaScaleCommentService;
-
     private Entity\UserSuperClass $connectedUser;
 
     public function __construct(
@@ -68,7 +66,6 @@ class AnrService
         Table\AnrInstanceMetadataFieldTable $anrInstanceMetadataFieldTable,
         ScaleService $scaleService,
         OperationalRiskScaleService $operationalRiskScaleService,
-        SoaScaleCommentService $soaScaleCommentService,
         ConnectedUserService $connectedUserService
     ) {
         $this->anrTable = $anrTable;
@@ -88,7 +85,6 @@ class AnrService
         $this->anrInstanceMetadataFieldTable = $anrInstanceMetadataFieldTable;
         $this->scaleService = $scaleService;
         $this->operationalRiskScaleService = $operationalRiskScaleService;
-        $this->soaScaleCommentService = $soaScaleCommentService;
         $this->connectedUser = $connectedUserService->getConnectedUser();
     }
 
@@ -111,8 +107,6 @@ class AnrService
         $this->operationalRiskScaleService->createScale($anr, Entity\OperationalRiskScaleSuperClass::TYPE_IMPACT, 0, 4);
         $this->operationalRiskScaleService
             ->createScale($anr, Entity\OperationalRiskScaleSuperClass::TYPE_LIKELIHOOD, 0, 4);
-
-        $this->soaScaleCommentService->createDefaultSoaScaleComments($anr);
 
         /** @var Entity\Anr $anr */
         return $anr;

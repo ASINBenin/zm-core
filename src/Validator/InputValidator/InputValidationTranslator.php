@@ -26,7 +26,7 @@ class InputValidationTranslator extends Translator implements TranslatorInterfac
         if ($connectedUserService->getConnectedUser() !== null) {
             $availableUiLanguages = isset($config['languages'])
                 ? array_keys($config['languages'])
-                : ['fr', 'en', 'de', 'nl', 'pt'];
+                : ['fr', 'en', 'de', 'nl'];
             $this->setLocale($availableUiLanguages[$connectedUserService->getConnectedUser()->getLanguage() - 1]);
         }
     }
