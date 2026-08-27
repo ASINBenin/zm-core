@@ -12,6 +12,7 @@ class FixPositionsCleanupDb extends AbstractMigration
 {
     public function change()
     {
+        $this->execute('SET FOREIGN_KEY_CHECKS = 0;');
         /* Cleanup and update data types. */
         $this->table('models')
             ->removeColumn('is_deleted')
@@ -202,8 +203,10 @@ class FixPositionsCleanupDb extends AbstractMigration
             ->addForeignKey('linked_measure_id', 'measures', 'uuid', ['delete' => 'CASCADE', 'update' => 'RESTRICT'])
             ->update();
 
-        /* Rename the `anr_metadatas_on_instances` to `anr_instance_metadata_fields`. */
-        $this->table('anr_metadatas_on_instances')->rename('anr_instance_metadata_fields')->update();
+        /* Recreate table `anr_metadatas_on_instances` as `anr_instance_metadata_fields`. */
+        $this->execute('CREATE TABLE IF NOT EXISTS anr_instance_metadata_fields LIKE anr_metadatas_on_instances;');
+        $this->execute('INSERT IGNORE INTO anr_instance_metadata_fields SELECT * FROM anr_metadatas_on_instances;');
+        $this->execute('DROP TABLE IF EXISTS anr_metadatas_on_instances;');
         $this->table('anr_instance_metadata_fields')
             ->changeColumn('anr_id', 'integer', ['signed' => false, 'null' => false])
             ->changeColumn('label_translation_key', 'string', ['null' => false, 'limit' => 255])
@@ -338,6 +341,7 @@ class FixPositionsCleanupDb extends AbstractMigration
             ->removeColumn('updater')
             ->removeColumn('updated_at')
             ->save();
+        $this->execute('SET FOREIGN_KEY_CHECKS = 1;');
     }
 
     /**
