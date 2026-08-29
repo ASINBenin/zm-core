@@ -28,11 +28,6 @@ use Monarc\Core\Service\Model\Entity as ServiceModelEntity;
 use Laminas\ServiceManager\AbstractFactory\ReflectionBasedAbstractFactory;
 use Laminas\ServiceManager\Factory\InvokableFactory;
 use Laminas\ServiceManager\Proxy\LazyServiceFactory;
-use Monarc\Core\Controller\SsoAuthenticationController;
-use Monarc\Core\Provider\IdentityProviderFactory;
-use Monarc\Core\Provider\IdentityProviderInterface;
-use Monarc\Core\Service\IdentityManagementService;
-use Monarc\Core\Service\IdentityManagementServiceFactory;
 
 $env = getenv('APPLICATION_ENV') ?: 'production';
 $dataPath = './data';
@@ -113,27 +108,6 @@ return [
                     ],
                 ],
             ],
-
-            'sso-redirect' => [
-                'type' => 'Literal',
-                'options' => [
-                    'route' => '/auth/sso/redirect',
-                    'defaults' => [
-                        'controller' => SsoAuthenticationController::class,
-                        'action' => 'redirect',
-                    ],
-                ],
-            ],
-            'sso-callback' => [
-                'type' => 'Literal',
-                'options' => [
-                    'route' => '/auth/sso/callback',
-                    'defaults' => [
-                        'controller' => SsoAuthenticationController::class,
-                        'action' => 'callback',
-                    ],
-                ],
-            ],
         ],
     ],
 
@@ -146,7 +120,6 @@ return [
         'factories' => [
             Controller\IndexController::class => InvokableFactory::class,
             Controller\AuthenticationController::class => AutowireFactory::class,
-            SsoAuthenticationController::class => ReflectionBasedAbstractFactory::class,
         ],
     ],
     'service_manager' => [
@@ -203,9 +176,6 @@ return [
             Service\SoaScaleCommentService::class => AutowireFactory::class,
             /* Export services. */
             Service\Export\ObjectExportService::class => AutowireFactory::class,
-
-            IdentityProviderInterface::class => IdentityProviderFactory::class,
-            IdentityManagementService::class => IdentityManagementServiceFactory::class,
 
             // TODO: Entities are created in a generic way. Should be removed.
             ModelEntity\DeliveriesModels::class => ServiceModelEntity\DeliveriesModelsServiceModelEntity::class,
