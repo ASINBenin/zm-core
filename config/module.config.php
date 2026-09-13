@@ -10,6 +10,7 @@ use Doctrine\Persistence\Mapping\Driver\MappingDriverChain;
 use Doctrine\ORM\Mapping\Driver\AnnotationDriver;
 use Monarc\Core\Adapter\Authentication as AdapterAuthentication;
 use Monarc\Core\Controller;
+use Monarc\Core\Provider;
 use Monarc\Core\Model\Db;
 use Monarc\Core\Model\DbCli;
 use Monarc\Core\Service\Helper\ScalesCacheHelper;
@@ -108,6 +109,53 @@ return [
                     ],
                 ],
             ],
+
+            // SSO (partagé FO/BO — voir Service\Sso\IdentityManagementService)
+            'auth_sso_redirect' => [
+                'type' => 'literal',
+                'options' => [
+                    'route' => '/auth/sso/redirect',
+                    'defaults' => [
+                        'controller' => Controller\Sso\SsoAuthenticationController::class,
+                        'action' => 'redirect',
+                    ],
+                ],
+            ],
+            'auth_sso_callback' => [
+                'type' => 'literal',
+                'options' => [
+                    'route' => '/auth/sso/callback',
+                    'defaults' => [
+                        'controller' => Controller\Sso\SsoAuthenticationController::class,
+                        'action' => 'callback',
+                    ],
+                ],
+            ],
+            'monarc_api_admin_user_identity' => [
+                'type' => 'segment',
+                'options' => [
+                    'route' => '/api/users/:userId/identity[/:id]',
+                    'constraints' => [
+                        'userId' => '[0-9]+',
+                        'id' => '[0-9]+',
+                    ],
+                    'defaults' => [
+                        'controller' => Controller\Sso\ApiUsersIdentityController::class,
+                    ],
+                ],
+            ],
+            'monarc_api_admin_identity_providers' => [
+                'type' => 'segment',
+                'options' => [
+                    'route' => '/api/identity-providers[/:id]',
+                    'constraints' => [
+                        'id' => '[0-9]+',
+                    ],
+                    'defaults' => [
+                        'controller' => Controller\Sso\ApiIdentityProvidersController::class,
+                    ],
+                ],
+            ],
         ],
     ],
 
@@ -120,6 +168,9 @@ return [
         'factories' => [
             Controller\IndexController::class => InvokableFactory::class,
             Controller\AuthenticationController::class => AutowireFactory::class,
+            Controller\Sso\SsoAuthenticationController::class => Controller\Sso\SsoAuthenticationControllerFactory::class,
+            Controller\Sso\ApiUsersIdentityController::class => Controller\Sso\ApiUsersIdentityControllerFactory::class,
+            Controller\Sso\ApiIdentityProvidersController::class => Controller\Sso\ApiIdentityProvidersControllerFactory::class,
         ],
     ],
     'service_manager' => [
@@ -130,6 +181,7 @@ return [
         'factories' => [
             Db::class => DbFactory::class,
             DbCli::class => DbCliFactory::class,
+            Service\Sso\IdentityManagementService::class => Service\Sso\IdentityManagementServiceFactory::class,
 
             // TODO: Services to refactor and replace with autowiring.
             Service\QuestionService::class => Service\QuestionServiceFactory::class,
@@ -385,6 +437,9 @@ return [
         'auth',
         'monarc_api_admin_passwords',
         'monarc_api_config',
+        'auth_sso_redirect',
+        'auth_sso_callback',
+        'monarc_api_admin_identity_providers',
     ],
 
     'defaultLanguageIndex' => 1,
