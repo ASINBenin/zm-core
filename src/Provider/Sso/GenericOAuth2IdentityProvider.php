@@ -119,10 +119,6 @@ class GenericOAuth2IdentityProvider implements IdentityProviderInterface
         }
 
         $httpHost = $_SERVER['HTTP_HOST'] ?? 'localhost:5001';
-        // Derrière un reverse proxy (Traefik) qui termine le TLS, la connexion
-        // interne au conteneur est en HTTP : $_SERVER['HTTPS'] ne reflète donc
-        // pas le protocole vu par le client. On se fie d'abord à l'en-tête
-        // X-Forwarded-Proto que Traefik ajoute à chaque requête transmise.
         $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
         $scheme = ($forwardedProto === 'https' || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'))
             ? 'https' : 'http';
