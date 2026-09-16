@@ -332,7 +332,11 @@ class IdentityManagementService
     private function handleCallback(array $params): array
     {
         $stateData = $this->verifyAndDecodeState($params['state'] ?? null);
-        $providerCode = $stateData['provider'] ?? 'trustedx_pki';
+        $providerCode = $stateData['provider'];
+
+        if (!$providerCode) {
+            throw new Exception("Le fournisseur d'identité n'a pas été trouvé.", 400);
+        }
 
         $providerInstance = $this->getProviderInstance($providerCode);
         $externalIdentity = $providerInstance->handleCallback($params);

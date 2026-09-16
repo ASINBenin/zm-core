@@ -107,7 +107,26 @@ class GenericOAuth2IdentityProvider implements IdentityProviderInterface
         return $data;
     }
 
-    protected function getRedirectUri(): string
+    // protected function getRedirectUri(): string
+    // {
+    //     if (!empty($this->config['redirect_uri'])) {
+    //         return (string)$this->config['redirect_uri'];
+    //     }
+
+    //     $appUrl = $this->config['app_url'] ?? (getenv('APP_URL') ?: null);
+    //     if (!empty($appUrl)) {
+    //         return rtrim((string)$appUrl, '/') . '/auth/sso/callback';
+    //     }
+
+    //     $httpHost = $_SERVER['HTTP_HOST'] ?? 'localhost:5001';
+    //     $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
+    //     $scheme = ($forwardedProto === 'https' || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'))
+    //         ? 'https' : 'http';
+
+    //     return "{$scheme}://{$httpHost}/auth/sso/callback";
+    // }
+
+        protected function getRedirectUri(): string
     {
         if (!empty($this->config['redirect_uri'])) {
             return (string)$this->config['redirect_uri'];
@@ -118,13 +137,17 @@ class GenericOAuth2IdentityProvider implements IdentityProviderInterface
             return rtrim((string)$appUrl, '/') . '/auth/sso/callback';
         }
 
-        $httpHost = $_SERVER['HTTP_HOST'] ?? 'localhost:5001';
+        $httpHost = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? 'localhost:5001';
         $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
         $scheme = ($forwardedProto === 'https' || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'))
             ? 'https' : 'http';
 
-        return "{$scheme}://{$httpHost}/auth/sso/callback";
+        $forwardedPrefix = $_SERVER['HTTP_X_FORWARDED_PREFIX'] ?? '';
+        $basePath = !empty($forwardedPrefix) ? '/' . trim((string)$forwardedPrefix, '/') : '';
+
+        return "{$scheme}://{$httpHost}{$basePath}/auth/sso/callback";
     }
+
 
     private function buildAuthorizationUrl(string $state, string $redirectUri): string
     {
