@@ -54,14 +54,17 @@ class IdentityManagementService
     // Point d'entrée principal du callback SSO
     public function processSsoCallback(array $params): string
     {
+        $forwardedPrefix = $_SERVER['HTTP_X_FORWARDED_PREFIX'] ?? '';
+        $basePath = !empty($forwardedPrefix) ? '/' . trim((string)$forwardedPrefix, '/') : '';
+
         try {
             $authResult = $this->handleCallback($params);
             $token = urlencode((string)$authResult['token']);
             $userId = urlencode((string)$authResult['user']->getId());
-            return "/#/sso-landing?token={$token}&uid={$userId}";
+            return "{$basePath}/#/sso-landing?token={$token}&uid={$userId}";
         } catch (\Throwable $e) {
             $errorMessage = urlencode($e->getMessage());
-            return "/#/sso-landing?error={$errorMessage}";
+            return "{$basePath}/#/sso-landing?error={$errorMessage}";
         }
     }
 
