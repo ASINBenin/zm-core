@@ -4,12 +4,16 @@ namespace Monarc\Core\Controller\Sso;
 
 use Psr\Container\ContainerInterface;
 use Laminas\ServiceManager\Factory\FactoryInterface;
+use Monarc\Core\Service\ConnectedUserService;
 use Monarc\Core\Service\Sso\IdentityManagementService;
 
 class SsoAuthenticationControllerFactory implements FactoryInterface
 {
     public function __invoke(ContainerInterface $container, $requestedName, ?array $options = null): SsoAuthenticationController
     {
-        return new SsoAuthenticationController($container->get(IdentityManagementService::class));
+        return new SsoAuthenticationController(
+            $container->get(IdentityManagementService::class),
+            $container->get(ConnectedUserService::class)
+        );
     }
 }

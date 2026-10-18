@@ -35,36 +35,43 @@ class IdentityManagementService
         $this->userEntityClass = $userEntityClass;
     }
 
-    // Génère l'URL d'autorisation vers le fournisseur SSO
-    public function getAuthorizationUrl(string $providerCode): string
+    // Génère l'URL d'autorisation vers le fournisseur SSO ; $browserNonce (cookie) lie le state au navigateur
+    public function getAuthorizationUrl(string $providerCode, string $browserNonce): string
     {
         $providerInstance = $this->getProviderInstance($providerCode);
-        $encodedState = $this->generateOAuthState($providerCode);
+        $encodedState = $this->generateOAuthState($providerCode, [], $browserNonce);
         return $providerInstance->getAuthorizationUrl($encodedState);
     }
 
-    // Génère une URL d'autorisation OAuth2 avec un redirect_uri personnalisé
-    public function getAuthorizationUrlWithCustomRedirect(string $providerCode, string $redirectUri): string
+    // Génère une URL d'autorisation OAuth2 avec un redirect_uri personnalisé ; $context est signé dans le state
+    public function getAuthorizationUrlWithCustomRedirect(string $providerCode, string $redirectUri, array $context = []): string
     {
         $providerInstance = $this->getProviderInstance($providerCode);
-        $encodedState = $this->generateOAuthState($providerCode);
+        $encodedState = $this->generateOAuthState($providerCode, $context);
         return $providerInstance->getAuthorizationUrlWithRedirect($encodedState, $redirectUri);
     }
 
+    // Vérifie le state OAuth2 reçu au retour du fournisseur et renvoie le contexte signé
+    public function getVerifiedStateContext(?string $state): array
+    {
+        return $this->verifyAndDecodeState($state)['ctx'] ?? [];
+    }
+
     // Point d'entrée principal du callback SSO
-    public function processSsoCallback(array $params): string
+    public function processSsoCallback(array $params, ?string $browserNonce): string
     {
         $forwardedPrefix = $_SERVER['HTTP_X_FORWARDED_PREFIX'] ?? '';
         $basePath = !empty($forwardedPrefix) ? '/' . trim((string)$forwardedPrefix, '/') : '';
 
         try {
-            $authResult = $this->handleCallback($params);
+            $authResult = $this->handleCallback($params, (string)$browserNonce);
             $token = urlencode((string)$authResult['token']);
             $userId = urlencode((string)$authResult['user']->getId());
             return "{$basePath}/#/sso-landing?token={$token}&uid={$userId}";
+        } catch (Exception $e) {
+            return "{$basePath}/#/sso-landing?error=" . urlencode($e->getMessage());
         } catch (\Throwable $e) {
-            $errorMessage = urlencode($e->getMessage());
-            return "{$basePath}/#/sso-landing?error={$errorMessage}";
+            return "{$basePath}/#/sso-landing?error=" . urlencode("Échec de l'authentification SSO.");
         }
     }
 
@@ -101,11 +108,13 @@ class IdentityManagementService
                 $tokenResponse = $providerInstance->refreshAccessToken($refreshToken);
                 $updatedSession = $this->saveSsoSession($user, $provider, $tokenResponse);
                 return $this->decryptToken($updatedSession->getAccessTokenEncrypted());
-            } catch (\Throwable $e) {
+            } catch (\Throwable) {
+                // Rafraîchissement refusé : la session TX n'est plus utilisable.
                 try {
                     $this->em->remove($ssoSession);
                     $this->em->flush();
-                } catch (\Throwable $ex) {}
+                } catch (\Throwable) {
+                }
                 return null;
             }
         }
@@ -116,102 +125,33 @@ class IdentityManagementService
     // Échange un code OAuth2 contre un token TX frais et le sauvegarde en DB
     public function exchangeAndSaveToken(string $code, string $redirectUri, UserSuperClass $user, string $providerCode = 'trustedx_pki'): void
     {
-        $ssoConfig    = $this->config['sso_providers'][$providerCode] ?? [];
-        $tokenUrl     = $ssoConfig['token_url']     ?? '';
-        $clientId     = $ssoConfig['client_id']     ?? '';
-        $clientSecret = $ssoConfig['client_secret'] ?? '';
+        $tokenResponse = $this->requestTokenWithCode($code, $redirectUri, $providerCode);
 
-        if (empty($tokenUrl) || empty($clientId)) {
-            throw new Exception("Configuration SSO manquante pour le provider '$providerCode'.", 500);
-        }
-
-        $postData = [
-            'grant_type'   => 'authorization_code',
-            'code'         => $code,
-            'redirect_uri' => $redirectUri,
-        ];
-
-        $ch = curl_init($tokenUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => http_build_query($postData),
-            CURLOPT_HTTPHEADER     => [
-                'Authorization: Basic ' . base64_encode("$clientId:$clientSecret"),
-                'Content-Type: application/x-www-form-urlencoded',
-                'Accept: application/json',
-            ],
-            CURLOPT_TIMEOUT        => 15,
-        ]);
-
-        $response  = curl_exec($ch);
-        $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if ($curlError) {
-            throw new Exception("Erreur réseau lors de l'échange de token TX: $curlError", 500);
-        }
-
-        $data = json_decode((string)$response, true);
-
-        if ($httpCode >= 400 || empty($data['access_token'])) {
-            $msg = $data['error_description'] ?? $data['error'] ?? "HTTP $httpCode";
-            throw new Exception("Échec de l'échange de code OAuth2 TX: $msg", 400);
-        }
-
-        $providerRepo = $this->em->getRepository(Provider::class);
-        $provider     = $providerRepo->findOneBy(['code' => $providerCode]);
+        $provider = $this->em->getRepository(Provider::class)->findOneBy(['code' => $providerCode]);
         if (!$provider) {
             throw new Exception("Provider '$providerCode' introuvable en base.", 500);
         }
 
-        $this->saveSsoSession($user, $provider, $data);
+        $this->saveSsoSession($user, $provider, $tokenResponse);
     }
 
-    // Échange un code OAuth2 TrustedX contre un access token frais
+    // Échange un code OAuth2 TrustedX contre un access token frais ; null si l'échange échoue
     public function exchangeSignatureCode(string $code, string $redirectUri, string $providerCode = 'trustedx_pki'): ?string
     {
-        $ssoConfig = $this->config['sso_providers'][$providerCode] ?? [];
-        $tokenUrl   = $ssoConfig['token_url']     ?? '';
-        $clientId   = $ssoConfig['client_id']     ?? '';
-        $clientSecret = $ssoConfig['client_secret'] ?? '';
-
-        if (empty($tokenUrl) || empty($clientId)) {
+        try {
+            return (string)$this->requestTokenWithCode($code, $redirectUri, $providerCode)['access_token'];
+        } catch (Exception) {
             return null;
         }
+    }
 
-        $postData = [
-            'grant_type'   => 'authorization_code',
-            'code'         => $code,
-            'redirect_uri' => $redirectUri,
-        ];
-
-        $ch = curl_init($tokenUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => http_build_query($postData),
-            CURLOPT_HTTPHEADER     => [
-                'Authorization: Basic ' . base64_encode("$clientId:$clientSecret"),
-                'Content-Type: application/x-www-form-urlencoded',
-                'Accept: application/json',
-            ],
-            CURLOPT_TIMEOUT        => 15,
-        ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if ($curlError) {
-            return null;
+    // Supprime les jetons TrustedX conservés pour l'utilisateur (déconnexion MONARC)
+    public function closeSsoSessions(UserSuperClass $user): void
+    {
+        foreach ($this->em->getRepository(SsoSession::class)->findBy(['userId' => $user->getId()]) as $ssoSession) {
+            $this->em->remove($ssoSession);
         }
-
-        $data = json_decode((string)$response, true);
-
-        return !empty($data['access_token']) ? (string)$data['access_token'] : null;
+        $this->em->flush();
     }
 
     // Récupère toutes les identités SSO liées à un utilisateur
@@ -250,7 +190,7 @@ class IdentityManagementService
         ]);
 
         if ($existing && $existing->getUserId() !== $userId) {
-            throw new Exception("Cet identifiant SSO ($providerIdentifier) est déjà associé à un autre utilisateur.", 400);
+            throw new Exception("Cet identifiant SSO ($providerIdentifier) est déjà associé à un autre utilisateur.", 412);
         }
 
         $identity = $identityRepo->findOneBy(['userId' => $userId, 'provider' => $provider]);
@@ -298,47 +238,43 @@ class IdentityManagementService
         return true;
     }
 
-    // Retourne la liste des fournisseurs d'identité actifs
+    // Retourne la liste des fournisseurs d'identité actifs (lecture seule : route publique de la page de connexion)
     public function getActiveProviders(): array
     {
-        $configuredProviders = [];
-
+        $result = [];
         foreach ($this->config['sso_providers'] ?? [] as $code => $conf) {
             if (isset($conf['is_active']) && !$conf['is_active']) {
                 continue;
             }
-            $configuredProviders[(string)$code] = $this->findOrCreateProvider((string)$code);
+            $result[(string)$code] = [
+                'code' => (string)$code,
+                'name' => $conf['name'] ?? ucfirst((string)$code),
+            ];
         }
 
-        $result = [];
-        foreach ($configuredProviders as $provider) {
-            $result[] = [
-                'id'   => $provider->getId(),
+        foreach ($this->em->getRepository(Provider::class)->findBy(['isActive' => true]) as $provider) {
+            $result[$provider->getCode()] ??= [
                 'code' => $provider->getCode(),
                 'name' => $provider->getName(),
             ];
         }
 
-        foreach ($this->em->getRepository(Provider::class)->findBy(['isActive' => true]) as $p) {
-            if (!isset($configuredProviders[$p->getCode()])) {
-                $result[] = [
-                    'id'   => $p->getId(),
-                    'code' => $p->getCode(),
-                    'name' => $p->getName(),
-                ];
-            }
-        }
-
-        return $result;
+        return array_values($result);
     }
 
-    private function handleCallback(array $params): array
+    private function handleCallback(array $params, string $browserNonce): array
     {
         $stateData = $this->verifyAndDecodeState($params['state'] ?? null);
+        if ($browserNonce === '' || !hash_equals((string)($stateData['csrf'] ?? ''), $browserNonce)) {
+            throw new Exception(
+                "Requête d'authentification SSO invalide (session navigateur différente). Veuillez relancer la connexion.",
+                412
+            );
+        }
         $providerCode = $stateData['provider'];
 
         if (!$providerCode) {
-            throw new Exception("Le fournisseur d'identité n'a pas été trouvé.", 400);
+            throw new Exception("Le fournisseur d'identité n'a pas été trouvé.", 412);
         }
 
         $providerInstance = $this->getProviderInstance($providerCode);
@@ -403,12 +339,13 @@ class IdentityManagementService
         ];
     }
 
-    private function generateOAuthState(string $providerCode): string
+    private function generateOAuthState(string $providerCode, array $context = [], ?string $csrf = null): string
     {
         $statePayload = [
-            'csrf'     => bin2hex(random_bytes(16)),
+            'csrf'     => $csrf ?? bin2hex(random_bytes(16)),
             'provider' => $providerCode,
             'exp'      => time() + 600,
+            'ctx'      => $context,
         ];
 
         $encodedPayload = $this->base64UrlEncode((string)json_encode($statePayload));
@@ -422,7 +359,7 @@ class IdentityManagementService
         if (empty($state) || !str_contains($state, '.')) {
             throw new Exception(
                 "Requête d'authentification SSO invalide ou expirée (paramètre 'state' manquant ou malformé). Veuillez relancer la connexion.",
-                400
+                412
             );
         }
 
@@ -432,7 +369,7 @@ class IdentityManagementService
         if (!hash_equals($expectedSignature, $signature)) {
             throw new Exception(
                 "Requête d'authentification SSO invalide (signature du 'state' incorrecte). Veuillez relancer la connexion.",
-                400
+                412
             );
         }
 
@@ -440,7 +377,7 @@ class IdentityManagementService
         if (!is_array($statePayload) || empty($statePayload['exp']) || time() > (int)$statePayload['exp']) {
             throw new Exception(
                 "Votre session d'authentification SSO a expiré. Veuillez relancer la connexion.",
-                400
+                412
             );
         }
 
@@ -478,8 +415,6 @@ class IdentityManagementService
             $ssoSession->setProvider($provider);
         }
 
-        $sessionToken = bin2hex(random_bytes(32));
-        $ssoSession->setSessionToken($sessionToken);
         $ssoSession->setAccessTokenEncrypted($this->encryptToken((string)$tokenResponse['access_token']));
         $ssoSession->setRefreshTokenEncrypted(
             !empty($tokenResponse['refresh_token']) ? $this->encryptToken((string)$tokenResponse['refresh_token']) : null
@@ -561,6 +496,56 @@ class IdentityManagementService
         );
 
         return $result !== false ? $result : null;
+    }
+
+    /**
+     * Appel du token endpoint (grant authorization_code).
+     *
+     * @return array Réponse du fournisseur, contenant au moins access_token.
+     */
+    private function requestTokenWithCode(string $code, string $redirectUri, string $providerCode): array
+    {
+        $ssoConfig    = $this->config['sso_providers'][$providerCode] ?? [];
+        $tokenUrl     = $ssoConfig['token_url']     ?? '';
+        $clientId     = $ssoConfig['client_id']     ?? '';
+        $clientSecret = $ssoConfig['client_secret'] ?? '';
+
+        if (empty($tokenUrl) || empty($clientId)) {
+            throw new Exception("Configuration SSO manquante pour le provider '$providerCode'.", 500);
+        }
+
+        $ch = curl_init($tokenUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => http_build_query([
+                'grant_type'   => 'authorization_code',
+                'code'         => $code,
+                'redirect_uri' => $redirectUri,
+            ]),
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Basic ' . base64_encode("$clientId:$clientSecret"),
+                'Content-Type: application/x-www-form-urlencoded',
+                'Accept: application/json',
+            ],
+            CURLOPT_TIMEOUT        => 15,
+        ]);
+
+        $response  = curl_exec($ch);
+        $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+
+        if ($curlError) {
+            throw new Exception("Erreur réseau lors de l'échange de token TX: $curlError", 500);
+        }
+
+        $data = json_decode((string)$response, true);
+        if ($httpCode >= 400 || empty($data['access_token'])) {
+            $msg = $data['error_description'] ?? $data['error'] ?? "HTTP $httpCode";
+            throw new Exception("Échec de l'échange de code OAuth2 TX: $msg", 412);
+        }
+
+        return $data;
     }
 
     protected function getProviderInstance(string $providerCode): IdentityProviderInterface

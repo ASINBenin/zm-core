@@ -27,14 +27,14 @@ class GenericOAuth2IdentityProvider implements IdentityProviderInterface
     {
         $code = $params['code'] ?? null;
         if (!$code) {
-            throw new Exception("Code d'autorisation OAuth2 manquant dans la réponse.", 400);
+            throw new Exception("Code d'autorisation OAuth2 manquant dans la réponse.", 412);
         }
 
         $tokenResponse = $this->exchangeCodeForToken($code);
         $accessToken = $tokenResponse['access_token'] ?? null;
 
         if (!$accessToken) {
-            throw new Exception("Échec de récupération de l'access token depuis le serveur d'autorisation.", 400);
+            throw new Exception("Échec de récupération de l'access token depuis le serveur d'autorisation.", 412);
         }
 
         $userInfo = $this->fetchUserInfo($accessToken);
@@ -50,7 +50,7 @@ class GenericOAuth2IdentityProvider implements IdentityProviderInterface
         $claimKey = (string)($this->config['identifier_claim']);
 
         if (!isset($userInfo[$claimKey]) || trim((string)$userInfo[$claimKey]) === '') {
-            throw new Exception("La claim d'identité '{$claimKey}' est absente des données renvoyées par le fournisseur SSO.", 400);
+            throw new Exception("La claim d'identité '{$claimKey}' est absente des données renvoyées par le fournisseur SSO.", 412);
         }
 
         $providerIdentifier = trim((string)$userInfo[$claimKey]);
@@ -101,32 +101,13 @@ class GenericOAuth2IdentityProvider implements IdentityProviderInterface
         $data = json_decode((string)$response, true);
         if ($httpCode >= 400 || empty($data['access_token'])) {
             $msg = $data['error_description'] ?? $data['error'] ?? "Erreur HTTP $httpCode lors du refresh token";
-            throw new Exception("Échec du rafraîchissement OAuth2: $msg", 400);
+            throw new Exception("Échec du rafraîchissement OAuth2: $msg", 412);
         }
 
         return $data;
     }
 
-    // protected function getRedirectUri(): string
-    // {
-    //     if (!empty($this->config['redirect_uri'])) {
-    //         return (string)$this->config['redirect_uri'];
-    //     }
-
-    //     $appUrl = $this->config['app_url'] ?? (getenv('APP_URL') ?: null);
-    //     if (!empty($appUrl)) {
-    //         return rtrim((string)$appUrl, '/') . '/auth/sso/callback';
-    //     }
-
-    //     $httpHost = $_SERVER['HTTP_HOST'] ?? 'localhost:5001';
-    //     $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
-    //     $scheme = ($forwardedProto === 'https' || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'))
-    //         ? 'https' : 'http';
-
-    //     return "{$scheme}://{$httpHost}/auth/sso/callback";
-    // }
-
-        protected function getRedirectUri(): string
+    protected function getRedirectUri(): string
     {
         if (!empty($this->config['redirect_uri'])) {
             return (string)$this->config['redirect_uri'];
@@ -205,7 +186,7 @@ class GenericOAuth2IdentityProvider implements IdentityProviderInterface
         $data = json_decode((string)$response, true);
         if ($httpCode >= 400 || empty($data['access_token'])) {
             $msg = $data['error_description'] ?? $data['error'] ?? "Erreur HTTP $httpCode lors du token exchange";
-            throw new Exception("Erreur d'authentification OAuth2: $msg", 400);
+            throw new Exception("Erreur d'authentification OAuth2: $msg", 412);
         }
 
         return $data;
@@ -241,7 +222,7 @@ class GenericOAuth2IdentityProvider implements IdentityProviderInterface
 
         $data = json_decode((string)$response, true);
         if ($httpCode >= 400 || !is_array($data)) {
-            throw new Exception("Impossible de récupérer le profil utilisateur (HTTP $httpCode).", 400);
+            throw new Exception("Impossible de récupérer le profil utilisateur (HTTP $httpCode).", 412);
         }
 
         return $data;
@@ -266,7 +247,7 @@ class GenericOAuth2IdentityProvider implements IdentityProviderInterface
         }
 
         if (!$this->verifyIdTokenSignature($headerB64, $payloadB64, $signatureB64, $jwksUrl)) {
-            throw new Exception("Signature du id_token OIDC invalide : authentification SSO rejetée.", 400);
+            throw new Exception("Signature du id_token OIDC invalide : authentification SSO rejetée.", 412);
         }
 
         return $payload;

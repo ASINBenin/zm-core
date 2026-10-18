@@ -11,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
  *
  * @ORM\Entity
  * @ORM\Table(name="sso_sessions", indexes={
- *     @ORM\Index(name="idx_sso_user_session", columns={"user_id", "session_token"})
+ *     @ORM\Index(name="idx_sso_user", columns={"user_id"})
  * })
  */
 class SsoSession
@@ -33,11 +33,6 @@ class SsoSession
      * @ORM\JoinColumn(name="provider_id", referencedColumnName="id", nullable=false, onDelete="CASCADE")
      */
     private Provider $provider;
-
-    /**
-     * @ORM\Column(type="string", length=100, name="session_token", nullable=false)
-     */
-    private string $sessionToken;
 
     /**
      * @ORM\Column(type="text", name="access_token_encrypted", nullable=false)
@@ -90,8 +85,6 @@ class SsoSession
     public function setUserId(int $userId): self { $this->userId = $userId; return $this; }
     public function getProvider(): Provider { return $this->provider; }
     public function setProvider(Provider $provider): self { $this->provider = $provider; return $this; }
-    public function getSessionToken(): string { return $this->sessionToken; }
-    public function setSessionToken(string $sessionToken): self { $this->sessionToken = $sessionToken; return $this; }
     public function getAccessTokenEncrypted(): string { return $this->accessTokenEncrypted; }
     public function setAccessTokenEncrypted(string $token): self { $this->accessTokenEncrypted = $token; return $this; }
     public function getRefreshTokenEncrypted(): ?string { return $this->refreshTokenEncrypted; }

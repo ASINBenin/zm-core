@@ -131,6 +131,16 @@ return [
                     ],
                 ],
             ],
+            'monarc_api_sso_session' => [
+                'type' => 'literal',
+                'options' => [
+                    'route' => '/api/sso/session',
+                    'defaults' => [
+                        'controller' => Controller\Sso\SsoAuthenticationController::class,
+                        'action' => 'closeSession',
+                    ],
+                ],
+            ],
             'monarc_api_admin_user_identity' => [
                 'type' => 'segment',
                 'options' => [

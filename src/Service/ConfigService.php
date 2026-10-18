@@ -76,35 +76,7 @@ class ConfigService
         ));
     }
 
-    // public function getHost(): string
-    // {
-    //     if (!empty($this->config['publicHost'])) {
-    //         return $this->config['publicHost'];
-    //     }
-
-    //     // Determine HTTP/HTTPS proto, and HTTP_HOST
-    //     if (isset($_SERVER['X_FORWARDED_PROTO'])) {
-    //         $proto = strtolower($_SERVER['X_FORWARDED_PROTO']);
-    //     } elseif (isset($_SERVER['X_URL_SCHEME'])) {
-    //         $proto = strtolower($_SERVER['X_URL_SCHEME']);
-    //     } elseif (isset($_SERVER['X_FORWARDED_SSL'])) {
-    //         $proto = strtolower($_SERVER['X_FORWARDED_SSL']) === 'on' ? 'https' : 'http';
-    //     } elseif (isset($_SERVER['FRONT_END_HTTPS'])) { // Microsoft variant
-    //         $proto = strtolower($_SERVER['FRONT_END_HTTPS']) === 'on' ? 'https' : 'http';
-    //     } elseif (isset($_SERVER['HTTPS'])) {
-    //         $proto = 'https';
-    //     } else {
-    //         $proto = 'http';
-    //     }
-
-    //     if (isset($_SERVER['X_FORWARDED_HOST'])) {
-    //         return $proto. '://' . $_SERVER['X_FORWARDED_HOST'];
-    //     }
-
-    //     return $proto. '://' . $_SERVER['HTTP_HOST'];
-    // }
-
-        public function getHost(): string
+    public function getHost(): string
     {
         if (!empty($this->config['publicHost'])) {
             return rtrim((string)$this->config['publicHost'], '/');
