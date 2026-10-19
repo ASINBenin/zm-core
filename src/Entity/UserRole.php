@@ -19,9 +19,10 @@ class UserRole extends UserRoleSuperClass
     public const DB_ADMIN = 'dbadmin';
     public const SYS_ADMIN = 'sysadmin';
     public const ACC_ADMIN = 'accadmin';
+    public const CAMP_ADMIN = 'campadmin';
 
     public static function getAvailableRoles(): array
     {
-        return [static::SUPER_ADMIN, static::DB_ADMIN, static::SYS_ADMIN, static::ACC_ADMIN];
+        return [static::SUPER_ADMIN, static::DB_ADMIN, static::SYS_ADMIN, static::ACC_ADMIN, static::CAMP_ADMIN];
     }
 }
