@@ -39,4 +39,22 @@ class UserTable extends AbstractTable
 
         return $user;
     }
+
+    /**
+     * Adresses des utilisateurs actifs qui ont ce rôle.
+     *
+     * @return string[]
+     */
+    public function findActiveEmailsByRole(string $role): array
+    {
+        return $this->getRepository()->createQueryBuilder('u')
+            ->select('u.email')
+            ->innerJoin('u.roles', 'r')
+            ->where('r.role = :role')
+            ->andWhere('u.status = :status')
+            ->setParameter('role', $role)
+            ->setParameter('status', UserSuperClass::STATUS_ACTIVE)
+            ->getQuery()
+            ->getSingleColumnResult();
+    }
 }

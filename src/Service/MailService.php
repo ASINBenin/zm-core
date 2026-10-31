@@ -34,11 +34,13 @@ class MailService
 
         $html = new Part($message);
         $html->type = 'text/html';
+        $html->charset = 'UTF-8';
 
         $body = new MimeMessage();
         $body->setParts([$html]);
 
         $mimeMessage = (new Message())
+            ->setEncoding('UTF-8')
             ->setBody($body)
             ->setFrom($from['from'], $from['name'])
             ->addTo($email, $email)
