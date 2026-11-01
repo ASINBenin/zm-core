@@ -444,7 +444,7 @@ class IdentityManagementService
             throw new Exception(
                 "Configuration manquante ou invalide : 'monarc_sso.encryption_key' doit être définie "
                 . "(chaîne aléatoire d'au moins 32 caractères) pour chiffrer les jetons SSO en base.",
-                500
+                412
             );
         }
 
