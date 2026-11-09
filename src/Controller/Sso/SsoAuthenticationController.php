@@ -28,7 +28,7 @@ class SsoAuthenticationController extends AbstractActionController
     {
         $providerCode = $this->params()->fromQuery('provider', 'trustedx_pki');
         $nonce = bin2hex(random_bytes(16));
-        $authUrl = $this->identityService->getAuthorizationUrl($providerCode, $nonce);
+        $authUrl = $this->identityService->getLoginStartUrl($providerCode, $nonce);
 
         $this->setNonceCookie($nonce, self::NONCE_TTL);
 

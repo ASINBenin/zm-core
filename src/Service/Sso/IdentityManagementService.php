@@ -36,11 +36,20 @@ class IdentityManagementService
     }
 
     // Génère l'URL d'autorisation vers le fournisseur SSO ; $browserNonce (cookie) lie le state au navigateur
-    public function getAuthorizationUrl(string $providerCode, string $browserNonce): string
+    // Adresse du fournisseur, ou la page de retour avec un message si le SSO est mal configuré sur ce serveur
+    public function getLoginStartUrl(string $providerCode, string $browserNonce): string
     {
-        $providerInstance = $this->getProviderInstance($providerCode);
-        $encodedState = $this->generateOAuthState($providerCode, [], $browserNonce);
-        return $providerInstance->getAuthorizationUrl($encodedState);
+        try {
+            $providerInstance = $this->getProviderInstance($providerCode);
+            $encodedState = $this->generateOAuthState($providerCode, [], $browserNonce);
+
+            return $providerInstance->getAuthorizationUrl($encodedState);
+        } catch (\Throwable $e) {
+            error_log('SSO : ' . $e->getMessage());
+
+            return $this->getLandingUrl() . '?error='
+                . urlencode("La connexion SSO n'est pas disponible sur ce serveur. Contactez l'administrateur.");
+        }
     }
 
     // Génère une URL d'autorisation OAuth2 avec un redirect_uri personnalisé ; $context est signé dans le state
@@ -60,19 +69,27 @@ class IdentityManagementService
     // Point d'entrée principal du callback SSO
     public function processSsoCallback(array $params, ?string $browserNonce): string
     {
-        $forwardedPrefix = $_SERVER['HTTP_X_FORWARDED_PREFIX'] ?? '';
-        $basePath = !empty($forwardedPrefix) ? '/' . trim((string)$forwardedPrefix, '/') : '';
+        $landingUrl = $this->getLandingUrl();
 
         try {
             $authResult = $this->handleCallback($params, (string)$browserNonce);
             $token = urlencode((string)$authResult['token']);
             $userId = urlencode((string)$authResult['user']->getId());
-            return "{$basePath}/#/sso-landing?token={$token}&uid={$userId}";
+            return "{$landingUrl}?token={$token}&uid={$userId}";
         } catch (Exception $e) {
-            return "{$basePath}/#/sso-landing?error=" . urlencode($e->getMessage());
+            return "{$landingUrl}?error=" . urlencode($e->getMessage());
         } catch (\Throwable $e) {
-            return "{$basePath}/#/sso-landing?error=" . urlencode("Échec de l'authentification SSO.");
+            return "{$landingUrl}?error=" . urlencode("Échec de l'authentification SSO.");
         }
+    }
+
+    // Page du front qui termine la connexion SSO, sous le préfixe de l'entité (/anip/...)
+    private function getLandingUrl(): string
+    {
+        $forwardedPrefix = $_SERVER['HTTP_X_FORWARDED_PREFIX'] ?? '';
+        $basePath = !empty($forwardedPrefix) ? '/' . trim((string)$forwardedPrefix, '/') : '';
+
+        return "{$basePath}/#/sso-landing";
     }
 
     // Récupère un access token valide pour l'utilisateur, en le rafraîchissant si expiré
@@ -238,28 +255,25 @@ class IdentityManagementService
         return true;
     }
 
-    // Retourne la liste des fournisseurs d'identité actifs (lecture seule : route publique de la page de connexion)
+    // Fournisseurs affichés sur la page de connexion (route publique) : seulement ceux qui peuvent connecter ici
     public function getActiveProviders(): array
     {
+        if (!$this->isEncryptionKeyValid()) {
+            return [];
+        }
+
         $result = [];
         foreach ($this->config['sso_providers'] ?? [] as $code => $conf) {
             if (isset($conf['is_active']) && !$conf['is_active']) {
                 continue;
             }
-            $result[(string)$code] = [
+            $result[] = [
                 'code' => (string)$code,
                 'name' => $conf['name'] ?? ucfirst((string)$code),
             ];
         }
 
-        foreach ($this->em->getRepository(Provider::class)->findBy(['isActive' => true]) as $provider) {
-            $result[$provider->getCode()] ??= [
-                'code' => $provider->getCode(),
-                'name' => $provider->getName(),
-            ];
-        }
-
-        return array_values($result);
+        return $result;
     }
 
     private function handleCallback(array $params, string $browserNonce): array
@@ -439,8 +453,7 @@ class IdentityManagementService
 
     private function getEncryptionKey(): string
     {
-        $key = $this->config['monarc_sso']['encryption_key'] ?? null;
-        if (empty($key) || strlen((string)$key) < 32) {
+        if (!$this->isEncryptionKeyValid()) {
             throw new Exception(
                 "Configuration manquante ou invalide : 'monarc_sso.encryption_key' doit être définie "
                 . "(chaîne aléatoire d'au moins 32 caractères) pour chiffrer les jetons SSO en base.",
@@ -448,7 +461,12 @@ class IdentityManagementService
             );
         }
 
-        return (string)$key;
+        return (string)$this->config['monarc_sso']['encryption_key'];
+    }
+
+    private function isEncryptionKeyValid(): bool
+    {
+        return strlen((string)($this->config['monarc_sso']['encryption_key'] ?? '')) >= 32;
     }
 
     private function encryptToken(string $plainText): string
