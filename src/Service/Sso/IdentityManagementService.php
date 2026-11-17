@@ -270,10 +270,36 @@ class IdentityManagementService
             $result[] = [
                 'code' => (string)$code,
                 'name' => $conf['name'] ?? ucfirst((string)$code),
+                'display' => $this->getProviderDisplay($conf['display'] ?? []),
             ];
         }
 
         return $result;
+    }
+
+    /**
+     * Apparence du bouton de connexion d'un fournisseur. La page est publique : seules des valeurs sûres passent
+     * (couleurs #rrggbb, image du site, nom d'icône Material), le reste est ignoré.
+     */
+    private function getProviderDisplay(array $display): array
+    {
+        $safeDisplay = [];
+        foreach (['background', 'color', 'border'] as $colorKey) {
+            if (isset($display[$colorKey]) && preg_match('/^#[0-9a-fA-F]{6}$/', (string)$display[$colorKey])) {
+                $safeDisplay[$colorKey] = $display[$colorKey];
+            }
+        }
+        $icon = (string)($display['icon'] ?? '');
+        if (preg_match('/^img\/sso\/[a-zA-Z0-9_-]+\.(svg|png)$/', $icon)) {
+            $safeDisplay['iconUrl'] = $icon;
+        } elseif (preg_match('/^[a-z0-9_]+$/', $icon)) {
+            $safeDisplay['icon'] = $icon;
+        }
+        if (isset($display['label']) && trim((string)$display['label']) !== '') {
+            $safeDisplay['label'] = mb_substr(trim((string)$display['label']), 0, 80);
+        }
+
+        return $safeDisplay;
     }
 
     private function handleCallback(array $params, string $browserNonce): array

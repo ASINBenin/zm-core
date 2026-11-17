@@ -43,7 +43,8 @@ class MailService
             ->setEncoding('UTF-8')
             ->setBody($body)
             ->setFrom($from['from'], $from['name'])
-            ->addTo($email, $email)
+            // Sans nom affiché : l'adresse en guise de nom était mal encodée en UTF-8 (« =?UTF-8?Q?...@ <...?= »)
+            ->addTo($email)
             ->setSubject($subject);
 
         $transport->send($mimeMessage);
